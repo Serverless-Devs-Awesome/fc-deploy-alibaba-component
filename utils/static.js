@@ -10,6 +10,10 @@ const DEFAULT_NAS_CONFIG = {
   MountPoints: []
 }
 
+const REQUESTOPTION = {
+  method: 'POST'
+}
+
 const DEFAULTVPCNAME = 'fc-fun-vpc';
 const DEFAULTVSWITCHNAME = 'fc-fun-vswitch-1';
 const DEFAULTSECURITYGROUPNAME = 'fc-fun-sg-1';
@@ -19,5 +23,6 @@ module.exports = {
   DEFAULT_NAS_CONFIG,
   DEFAULTVPCNAME,
   DEFAULTVSWITCHNAME,
+  REQUESTOPTION,
   DEFAULTSECURITYGROUPNAME,
 }

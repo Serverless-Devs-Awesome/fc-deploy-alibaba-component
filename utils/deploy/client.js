@@ -60,6 +60,18 @@ class Client {
       }
     })
   }
+
+  buildNasClient () {
+    return new Pop({
+      endpoint: `http://nas.${this.region}.aliyuncs.com`,
+      apiVersion: '2017-06-26',
+      accessKeyId: this.accessKeyID,
+      accessKeySecret: this.accessKeySecret,
+      opts: {
+        timeout: 60 * 1000
+      }
+    })
+  }
 }
 
 module.exports = Client

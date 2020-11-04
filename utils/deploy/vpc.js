@@ -3,15 +3,13 @@ const Client = require('./client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
 const { sleep } = require('./utils');
+const Vswitch = require('./vswitch');
 const {
+  REQUESTOPTION,
   DEFAULTVPCNAME,
   DEFAULTVSWITCHNAME,
   DEFAULTSECURITYGROUPNAME
 } = require('../static');
-
-const requestOption = {
-  method: 'POST'
-}
 
 class Vpc extends Client {
   constructor (credentials, region) {
@@ -35,7 +33,7 @@ class Vpc extends Client {
   
       await sleep(1000);
   
-      const rs = await this.vpcClient.request('DescribeVpcs', params, requestOption);
+      const rs = await this.vpcClient.request('DescribeVpcs', params, REQUESTOPTION);
       const vpcs = rs.Vpcs.Vpc;
       if (vpcs && vpcs.length) {
         status = vpcs[0].Status;
@@ -64,7 +62,7 @@ class Vpc extends Client {
         PageNumber: ++requestPageNumber
       };
   
-      const rs = await this.vpcClient.request('DescribeVpcs', params, requestOption);
+      const rs = await this.vpcClient.request('DescribeVpcs', params, REQUESTOPTION);
   
       totalCount = rs.TotalCount;
       pageNumber = rs.PageNumber;
@@ -92,7 +90,7 @@ class Vpc extends Client {
     let createRs;
   
     try {
-      createRs = await this.vpcClient.request('CreateVpc', createParams, requestOption)
+      createRs = await this.vpcClient.request('CreateVpc', createParams, REQUESTOPTION)
     } catch (ex) {
       new ServerlessError(ex, true);
     }
@@ -104,6 +102,20 @@ class Vpc extends Client {
     await this.waitVpcUntilAvaliable(vpcClient, region, vpcId);
   
     return vpcId
+  }
+
+  async createDefaultVSwitchIfNotExist (vpcId, vswitchIds) {
+    const vswitch = new Vswitch(this.credentials, this.region);
+    let vswitchId = await vswitch.findVswitchExistByName(vswitchIds, DEFAULTVSWITCHNAME);
+  
+    if (!vswitchId) { // create vswitch
+      this.logger.info('Generating default vswitch');
+      vswitchId = await vswitch.createDefaultVSwitch(vpcId, DEFAULTVSWITCHNAME);
+      this.logger.success('Default vswitch has been generated, vswitchId is: ' + vswitchId)
+    } else {
+      this.logger.info('Vswitch already exists, vswitchId is: ' + vswitchId)
+    }
+    return vswitchId;
   }
 
   async createDefaultVpcIfNotExist() {
@@ -124,7 +136,7 @@ class Vpc extends Client {
     }
 
     this.logger.log(`vpcId is ${vpcId}`);
-    // const vswitchId = await createDefaultVSwitchIfNotExist(credentials, vpcClient, region, vpcId, vswitchIds)
+    const vswitchId = await this.createDefaultVSwitchIfNotExist(vpcId, vswitchIds)
 
     // vswitchIds = [vswitchId]
     // // create security

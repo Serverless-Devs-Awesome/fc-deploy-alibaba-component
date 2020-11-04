@@ -264,9 +264,7 @@ class Deploy extends Client {
     // 创建 vpc 的规则：vpc 为 Auto，或者 vpc 不存在 nas 为 Auto
     if (isVpcAuto || (_.isEmpty(vpcConfig) && isNasAuto)) {
       this.logger.info('Using \'Vpc: Auto\'');
-
       vpcConfig = await this.vpc.createDefaultVpcIfNotExist(this.credentials, this.region);
-
       this.logger.success('Default vpc config:' + JSON.stringify(vpcConfig));
       await this.saveConfigToTemplate('Vpc', vpcConfig);
     }
