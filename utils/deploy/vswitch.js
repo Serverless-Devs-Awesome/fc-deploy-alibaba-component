@@ -93,7 +93,7 @@ class Vswitch extends Client {
   async createDefaultVSwitch (vpcId, vswitchName) {
     const vswitchZoneId = await selectAllowedVSwitchZone();
   
-    var vswitchId;
+    let vswitchId;
     try {
       // 创建 vswitch
       vswitchId = await createVSwitch(this.vpcClient, {

@@ -4,6 +4,7 @@ const Logger = require('../logger');
 const ServerlessError = require('../error');
 const { sleep } = require('./utils');
 const Vswitch = require('./vswitch');
+const SecurityGroups = require('./securityGroups');
 const {
   REQUESTOPTION,
   DEFAULTVPCNAME,
@@ -26,7 +27,7 @@ class Vpc extends Client {
     do {
       count++;
   
-      var params = {
+      const params = {
         RegionId: this.region,
         VpcId: vpcId
       };
@@ -118,6 +119,29 @@ class Vpc extends Client {
     return vswitchId;
   }
 
+  async createDefaultSecurityGroupIfNotExist (vpcId) {
+    // check fun default security group exist?
+    const securityGroup = new SecurityGroups(this.credentials, this.region);
+    const defaultSecurityGroup = await securityGroup.describeSecurityGroups(vpcId, DEFAULTSECURITYGROUPNAME);
+    this.logger.log(`default security grpup: ${JSON.stringify(defaultSecurityGroup)}`);
+  
+    // create security group
+    if (_.isEmpty(defaultSecurityGroup)) {
+      this.logger.info('Generating default security group');
+      const securityGroupId = await securityGroup.createSecurityGroup(ecsClient, region, vpcId, DEFAULTSECURITYGROUPNAME);
+  
+      this.logger.success(`Default security group generated, securityGroupId is: ${securityGroupId}`);
+      this.logger.info('Generating default security group rules');
+      await securityGroup.authDefaultSecurityGroupRules(ecsClient, region, securityGroupId);
+      this.logger.info('Security group rules generated');
+      return securityGroupId;
+    }
+  
+    const securityGroupId = defaultSecurityGroup[0].SecurityGroupId
+    this.logger.info('Security group already exists, security group is: ' + securityGroupId)
+    return securityGroupId
+  }
+
   async createDefaultVpcIfNotExist() {
     let vswitchIds;
     let vpcId;
@@ -134,19 +158,18 @@ class Vpc extends Client {
       vpcId = await this.createVpc(DEFAULTVPCNAME);
       this.logger.success('Default vpc has been generated, vpcId is: ' + vpcId);
     }
-
     this.logger.log(`vpcId is ${vpcId}`);
-    const vswitchId = await this.createDefaultVSwitchIfNotExist(vpcId, vswitchIds)
 
-    // vswitchIds = [vswitchId]
-    // // create security
-    // const securityGroupId = await createDefaultSecurityGroupIfNotExist(ecsClient, region, vpcId)
+    const vswitchId = await this.createDefaultVSwitchIfNotExist(vpcId, vswitchIds);
+    vswitchIds = [vswitchId];
 
-    // return {
-    //   vpcId,
-    //   vswitchIds,
-    //   securityGroupId
-    // }
+    // create security
+    const securityGroupId = await this.createDefaultSecurityGroupIfNotExist(vpcId)
+    return {
+      vpcId,
+      vswitchIds,
+      securityGroupId
+    }
   }
 }
 
