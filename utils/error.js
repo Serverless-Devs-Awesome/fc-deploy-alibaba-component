@@ -11,9 +11,9 @@ class ServerlessError {
     if (e instanceof Error) {
       throw e;
     } else {
-      const { code, message } = e;
+      const { name, message } = e;
       const err = new Error(message);
-      err.name = code;
+      err.name = name;
       throw err;
     }
   }

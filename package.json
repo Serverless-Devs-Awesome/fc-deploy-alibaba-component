@@ -11,6 +11,10 @@
   "license": "ISC",
   "dependencies": {
     "@alicloud/fc2": "^2.2.2",
-    "@serverless-devs/s-core": "0.0.22"
+    "@alicloud/ram": "^1.0.0",
+    "@serverless-devs/s-core": "0.0.22",
+    "js-yaml": "^3.14.0",
+    "lodash": "^4.17.20",
+    "promise-retry": "^2.0.1"
   }
 }
