@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "@alicloud/fc2": "^2.2.2",
+    "@alicloud/pop-core": "^1.7.10",
     "@alicloud/ram": "^1.0.0",
     "@serverless-devs/s-core": "0.0.22",
     "js-yaml": "^3.14.0",

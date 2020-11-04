@@ -2,6 +2,7 @@
 
 const FC = require('@alicloud/fc2');
 const RAM = require('@alicloud/ram');
+const Pop = require('@alicloud/pop-core');
 
 class Client {
   constructor (credentials, region) {
@@ -32,6 +33,30 @@ class Client {
       endpoint: 'https://ram.aliyuncs.com',
       opts: {
         timeout: 60000
+      }
+    })
+  }
+
+  buildVpcClient () {
+    return new Pop({
+      endpoint: 'https://vpc.aliyuncs.com',
+      apiVersion: '2016-04-28',
+      accessKeyId: this.accessKeyID,
+      accessKeySecret: this.accessKeySecret,
+      opts: {
+        timeout: 60 * 1000
+      }
+    })
+  }
+
+  buildEcsClient () {
+    return new Pop({
+      endpoint: 'https://ecs.aliyuncs.com',
+      apiVersion: '2014-05-26',
+      accessKeyId: this.accessKeyID,
+      accessKeySecret: this.accessKeySecret,
+      opts: {
+        timeout: 60 * 1000
       }
     })
   }
