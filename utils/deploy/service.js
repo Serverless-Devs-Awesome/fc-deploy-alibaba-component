@@ -249,14 +249,16 @@ class Service extends Client {
       options.internetAccess = internetAccess;
     }
 
-    const resolvedLogConfig = await this.logClient.transformLogConfig(this.inputs);
-    if (utils.isLogConfigAuto(logConfig)) {
-      await this.saveConfigToTemplate('Log', {
-        Project: resolvedLogConfig.project,
-        LogStore: resolvedLogConfig.logStore
-      })
+    if (utils.isLogConfigAuto(logConfig) || !_.isEmpty(logConfig)) {
+      const resolvedLogConfig = await this.logClient.transformLogConfig(this.inputs);
+      if (utils.isLogConfigAuto(logConfig)) {
+        await this.saveConfigToTemplate('Log', {
+          Project: resolvedLogConfig.project,
+          LogStore: resolvedLogConfig.logStore
+        })
+      }
+      options.logConfig = resolvedLogConfig;
     }
-    options.logConfig = resolvedLogConfig;
 
     const isNasAuto = utils.isNasAutoConfig(nasConfig);
     const isVpcAuto = utils.isVpcAutoConfig(vpcConfig);

@@ -124,7 +124,7 @@ class FcComponent extends Component {
           Domains: t
         })
       }
-      if (!_.isEmpty(triggerConfig)) {
+      if (commands[0] === 'domain' && !_.isEmpty(triggerConfig)) {
         output.Domains = triggerConfig;
       }
     }
