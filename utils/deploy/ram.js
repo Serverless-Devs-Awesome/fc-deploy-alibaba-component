@@ -3,7 +3,7 @@
 const _ = require('lodash')
 
 const Client = require('../client')
-const { promiseRetry } = require('./utils')
+const { promiseRetry } = require('../utils')
 const Logger = require('../logger')
 const ServerlessError = require('../error')
 

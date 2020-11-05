@@ -2,7 +2,7 @@ const _ = require('lodash');
 const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
-const { sleep } = require('./utils');
+const { sleep } = require('../utils');
 const Vswitch = require('./vswitch');
 const SecurityGroups = require('./security-groups');
 const {

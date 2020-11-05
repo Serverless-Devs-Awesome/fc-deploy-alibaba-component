@@ -1,10 +1,10 @@
 const retry = require('promise-retry');
 const _ = require('lodash');
-const ServlessError = require('../error');
-const Logger = require('../logger');
+const ServlessError = require('./error');
+const Logger = require('./logger');
 const {
   REQUESTOPTION
-} = require('../static');
+} = require('./static');
 
 const logger = new Logger();
 

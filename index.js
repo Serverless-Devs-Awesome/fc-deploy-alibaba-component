@@ -7,6 +7,7 @@ const Logger = require('./utils/logger');
 
 const Service = require('./utils/deploy/service');
 const FcFunction = require('./utils/deploy/function');
+const Trigger = require('./utils/deploy/trigger');
 
 class FcComponent extends Component {
   constructor() {
@@ -86,6 +87,12 @@ class FcComponent extends Component {
         onlyDelpoyConfig
       })
       this.logger.success(`function ${functionName} ${onlyDelpoyConfig || deployAllConfig ? 'config update success' : 'deploy success'}\n`);
+    }
+
+    if (deployTriggers) {
+      const fcTrigger = new Trigger(credentials, region);
+      const triggerName = parameters.n || parameters.name;
+      output.Triggers = await fcTrigger.deploy(properties, serviceName, functionName, triggerName, commands[0] === 'trigger');
     }
 
   }

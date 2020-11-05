@@ -2,7 +2,7 @@ const _ = require('lodash');
 const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
-const utils = require('./utils');
+const utils = require('../utils');
 const {
   REQUESTOPTION
 } = require('../static');

@@ -7,7 +7,7 @@ const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
 const Ram = require('./ram');
-const utils = require('./utils');
+const utils = require('../utils');
 const Vpc = require('./vpc');
 const {
   DEFAULT_VPC_CONFIG,
