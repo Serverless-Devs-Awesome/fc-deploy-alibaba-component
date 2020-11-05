@@ -4,7 +4,7 @@ const Logger = require('../logger');
 const ServerlessError = require('../error');
 const { sleep } = require('./utils');
 const Vswitch = require('./vswitch');
-const SecurityGroups = require('./securityGroups');
+const SecurityGroups = require('./security-groups');
 const {
   REQUESTOPTION,
   DEFAULTVPCNAME,
@@ -44,7 +44,7 @@ class Vpc extends Client {
     } while (count < 15 && status !== 'Available')
   
     if (status !== 'Available') {
-      new ServerlessError({ message: `Timeout while waiting for vpc ${vpcId} status to be 'Available'`}, true);
+      new ServerlessError({ message: `Timeout while waiting for vpc ${vpcId} status to be 'Available'`});
     }
   }
 
@@ -93,7 +93,7 @@ class Vpc extends Client {
     try {
       createRs = await this.vpcClient.request('CreateVpc', createParams, REQUESTOPTION)
     } catch (ex) {
-      new ServerlessError(ex, true);
+      new ServerlessError(ex);
     }
   
     const vpcId = createRs.VpcId;

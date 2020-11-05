@@ -19,7 +19,6 @@ class Deploy extends Client {
     super(credentials, region);
     this.fcClient = this.buildFcClient();
     this.ram = new Ram(credentials);
-    this.vpc = new Vpc(credentials, region);
     this.logger = new Logger();
   }
 
@@ -73,7 +72,7 @@ class Deploy extends Client {
         new ServerlessError({
           name: 'ExtractFcRoleError',
           message: 'The role you provided is not correct. You must provide the correct role arn.'
-        }, true);
+        });
       }
     }
 
@@ -120,7 +119,7 @@ class Deploy extends Client {
       new ServerlessError({
         name: 'ExtractFcRoleError',
         message: 'LogStore and Project must both exist.'
-      }, true);
+      });
     } 
 
     if (!roleArn && hasCustomContainerConfig) {
@@ -199,11 +198,11 @@ class Deploy extends Client {
       } catch (e) {
         slsRetry++;
         if (slsRetry >= retryTimes) {
-          new ServerlessError(e, true);
+          new ServerlessError(e);
         }
         if (this.isSlsNotExistException(e)) {
           await utils.sleep(3000)
-        } else { new ServerlessError(e, true) }
+        } else { new ServerlessError(e) }
       }
     } while (slsRetry < retryTimes)
   }
@@ -220,7 +219,7 @@ class Deploy extends Client {
           } else {
             this.logger.error('\nThe accountId you entered is incorrect. You can only use the primary account id, whether or not you use a sub-account or a primary account ak. You can get primary account ID on this page https://account.console.aliyun.com/#/secure .\n')
           }
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         } else if (ex.code !== 'ServiceNotFound') {
           this.logger.info(`Retry ${times} times`)
           retry(ex);
@@ -264,50 +263,28 @@ class Deploy extends Client {
     // 创建 vpc 的规则：vpc 为 Auto，或者 vpc 不存在 nas 为 Auto
     if (isVpcAuto || (_.isEmpty(vpcConfig) && isNasAuto)) {
       this.logger.info('Using \'Vpc: Auto\'');
-      vpcConfig = await this.vpc.createDefaultVpcIfNotExist(this.credentials, this.region);
+      const vpc = new Vpc(this.credentials, this.region);
+      vpcConfig = await vpc.createDefaultVpcIfNotExist(this.credentials, this.region);
       this.logger.success('Default vpc config:' + JSON.stringify(vpcConfig));
       await this.saveConfigToTemplate('Vpc', vpcConfig);
     }
+    options.vpcConfig = vpcConfig || DEFAULT_VPC_CONFIG;
 
-    /** 
-
-    if (isVpcAuto || (_.isEmpty(vpcConfig) && isNasAuto)) {
-      this.logger.info('Using \'Vpc: Auto\'')
-      vpcConfig = await vpc.createDefaultVpcIfNotExist(this.credentials, this.region)
-      this.logger.success('Default vpc config:' + JSON.stringify(vpcConfig))
-
-      await this.saveConfigToTemplate('Vpc', vpcConfig)
-    }
-
-    Object.assign(options, {
-      vpcConfig: vpcConfig || DEFAULT_VPC_CONFIG
-    })
     if (isNasAuto) {
-      const vpcId = vpcConfig.vpcId || vpcConfig.VpcId
-      const vswitchIds = vpcConfig.vswitchIds || vpcConfig.VSwitchIds
-
-      this.logger.info(`Using 'Nas: Auto'`)
-      nasConfig = await nas.generateAutoNasConfig(this.credentials, this.region, serviceName, vpcId, vswitchIds, nasConfig.UserId, nasConfig.GroupId, nasConfig.FcDir, nasConfig.LocalDir)
-      this.logger.success('Default nas config: ' + JSON.stringify(nas.transformClientConfigToToolConfig(nasConfig)))
-
-      const saveConfig = nas.transformClientConfigToToolConfig(nasConfig)
-      await this.saveConfigToTemplate('Nas', saveConfig)
+      this.logger.warn('暂时不支持 nas auto 了.');
+      nasConfig = undefined; 
     } else {
-      // transform nas config from tool format to fc client format
-      nasConfig = nas.transformToolConfigToFcClientConfig(nasConfig)
+      nasConfig = utils.transformToolConfigToFcClientConfig(nasConfig);
     }
-    Object.assign(options, {
-      nasConfig: nasConfig || DEFAULT_NAS_CONFIG
-    })
-    */
+    options.nasConfig = nasConfig || DEFAULT_NAS_CONFIG;
 
     // 创建函数
     await utils.promiseRetry(async (retry, times) => {
       try {
-        service = await this.retryUntilSlsCreated(serviceName, options, !service)
+        service = await this.retryUntilSlsCreated(serviceName, options, !service);
       } catch (ex) {
         if (ex.code === 'AccessDenied' || ex.code === 'InvalidArgument' || this.isSlsNotExistException(ex)) {
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         }
         this.logger.log(`error when createService or updateService, serviceName is ${serviceName}, options is ${options}, error is: \n${ex}`);
         this.logger.info(`Retry ${times} times`);

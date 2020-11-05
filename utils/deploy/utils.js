@@ -1,6 +1,12 @@
 const retry = require('promise-retry');
 const _ = require('lodash');
 const ServlessError = require('../error');
+const Logger = require('../logger');
+const {
+  REQUESTOPTION
+} = require('../static');
+
+const logger = new Logger();
 
 function promiseRetry (fn) {
   const retryOptions = {
@@ -85,6 +91,64 @@ function sleep (ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+async function getFcAllowedZones (fcClient, region) {
+  const fcRs = await fcClient.getAccountSettings();
+  const fcAllowedZones = fcRs.data.availableAZs;  
+  logger.log(`fc allowed zones: ${fcAllowedZones}`);
+
+  if (_.isEqual(fcAllowedZones, [''])) {
+    new ServerlessError({
+      message: `No fc vswitch zones allowed, you may need login to fc console to apply for VPC feature: https://fc.console.aliyun.com/overview/${region}`
+    });
+  }
+
+  return fcAllowedZones;
+}
+async function describeVpcZones (vpcClient, region) {
+  const zones = await vpcClient.request('DescribeZones', { RegionId: region }, REQUESTOPTION);
+  return zones.Zones.Zone;
+}
+async function describeNasZones (nasClient, region) {
+  const zones = await nasClient.request('DescribeZones', { RegionId: region }, REQUESTOPTION);
+  return zones.Zones.Zone;
+}
+async function describeVSwitchAttributes (vpcClient, region, vswitchId) {
+  const params = {
+    RegionId: region,
+    VSwitchId: vswitchId
+  }
+  return await vpcClient.request('DescribeVSwitchAttributes', params, requestOption)
+}
+
+function transformToolConfigToFcClientConfig (nasConfig) {
+  if (!nasConfig || nasConfig === 'Auto') {
+    return nasConfig
+  }
+
+  const fcClientMountPoints = []
+  if (!_.isEmpty(nasConfig.MountPoints)) {
+    for (const mountPoint of nasConfig.MountPoints) {
+      if (mountPoint.NasAddr && mountPoint.NasDir) {
+        fcClientMountPoints.push({
+          ServerAddr: `${mountPoint.NasAddr}:${mountPoint.NasDir}`,
+          MountDir: mountPoint.FcDir
+        })
+      } else if (mountPoint.ServerAddr && mountPoint.MountDir) {
+        // support old format
+        fcClientMountPoints.push({
+          ServerAddr: mountPoint.ServerAddr,
+          MountDir: mountPoint.MountDir
+        })
+      }
+    }
+  }
+  return {
+    GroupId: nasConfig.GroupId,
+    UserId: nasConfig.UserId,
+    MountPoints: fcClientMountPoints
+  }
+}
+
 module.exports = {
   getRoleArnFromServiceProps,
   normalizeRoleOrPoliceName,
@@ -92,6 +156,11 @@ module.exports = {
   isLogConfigAuto,
   isNasAutoConfig,
   isVpcAutoConfig,
+  getFcAllowedZones,
+  describeVpcZones,
+  describeNasZones,
+  describeVSwitchAttributes,
+  transformToolConfigToFcClientConfig,
   sleep,
   promiseRetry
 }

@@ -2,7 +2,7 @@ const _ = require('lodash');
 const Client = require('./client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
-const { sleep } = require('./utils');
+const utils = require('./utils');
 const {
   REQUESTOPTION
 } = require('../static');
@@ -17,19 +17,11 @@ class Vswitch extends Client {
     this.nasClient = this.buildNasClient();
     this.fcClient = this.buildFcClient();
   }
-  
-  async describeVSwitchAttributes (vswitchId) {
-    const params = {
-      RegionId: this.region,
-      VSwitchId: vswitchId
-    }
-    return await this.vpcClient.request('DescribeVSwitchAttributes', params, REQUESTOPTION)
-  }
 
   async findVswitchExistByName (vswitchIds, searchVSwtichName) {
     if (!_.isEmpty(vswitchIds)) {
       for (const vswitchId of vswitchIds) {
-        const describeRs = await this.describeVSwitchAttributes(vswitchId);
+        const describeRs = await utils.describeVSwitchAttributes(this.vpcClient, this.region, vswitchId);
         const vswitchName = (describeRs || {}).VSwitchName;
 
         if (_.isEqual(searchVSwtichName, vswitchName)) {
@@ -42,28 +34,6 @@ class Vswitch extends Client {
     return null;
   }
 
-  // 查找可用区的交集
-  async getFcAllowedZones () {
-    const fcRs = await this.fcClient.getAccountSettings();
-    const fcAllowedZones = fcRs.data.availableAZs;  
-    this.logger.log(`fc allowed zones: ${fcAllowedZones}`);
-
-    if (_.isEqual(fcAllowedZones, [''])) {
-      new ServerlessError({
-        message: `No fc vswitch zones allowed, you may need login to fc console to apply for VPC feature: https://fc.console.aliyun.com/overview/${this.region}`
-      }, true);
-    }
-  
-    return fcAllowedZones;
-  }
-  async describeVpcZones () {
-    const zones = await this.vpcClient.request('DescribeZones', { RegionId: this.region }, REQUESTOPTION);
-    return zones.Zones.Zone;
-  }
-  async describeNasZones () {
-    const zones = await this.nasClient.request('DescribeZones', { RegionId: this.region }, REQUESTOPTION);
-    return zones.Zones.Zone;
-  }
   async selectVSwitchZoneId (fcAllowedZones, vpcZones, nasZones) {
     const allowedZones = _.filter(vpcZones, z => {
       return _.includes(fcAllowedZones, z.ZoneId) && _.includes(nasZones.map(zone => { return zone.ZoneId }), z.ZoneId)
@@ -76,15 +46,15 @@ class Vswitch extends Client {
   
 
   async selectAllowedVSwitchZone () {
-    const fcAllowedZones = await this.getFcAllowedZones();
-    const vpcZones = await this.describeVpcZones();
-    const nasZones = await this.describeNasZones();
+    const fcAllowedZones = await utils.getFcAllowedZones(this.fcClient, this.region);
+    const vpcZones = await utils.describeVpcZones(this.vpcClient, this.region);
+    const nasZones = await utils.describeNasZones(this.nasClient, this.region);
   
     const usedZoneId = await this.selectVSwitchZoneId(fcAllowedZones, vpcZones, nasZones)
     if (!usedZoneId) {
       new ServerlessError({
         message: 'no availiable zone for vswitch'
-      }, true);
+      });
     }
     this.logger.log(`select allowed switch zone: ${usedZoneId}`);
     return usedZoneId
@@ -126,7 +96,7 @@ class Vswitch extends Client {
         vswitchName: vswitchName
       })
     } catch (ex) {
-      new ServerlessError(ex, true);
+      new ServerlessError(ex);
     }
     return vswitchId;
   }

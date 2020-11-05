@@ -3,7 +3,7 @@ const { Component } = require('@serverless-devs/s-core');
 
 const getHelp = require('./utils/help');
 const ServerlessError = require('./utils/error');
-const Deploy = require('./utils/deploy');
+const Service = require('./utils/deploy/service');
 const Logger = require('./utils/logger');
 const { isLogConfigAuto } = require('./utils/deploy/utils');
 
@@ -40,7 +40,7 @@ class FcComponent extends Component {
       new ServerlessError({
         name: 'CommandsError',
         message: 'Commands error,please execute the \'s deploy --help\' command.'
-      }, true)
+      });
     }
 
     const deployService = commands[0] === 'service' || deployAllConfig || deployAll;
@@ -50,21 +50,21 @@ class FcComponent extends Component {
     const deployDomain = commands[0] === 'domain' || deployAll;
 
     const output = {};
-    const deployComponent = new Deploy(credentials, region);
     
     if (deployService) {      
       const hasFunctionAsyncConfig = _.has(functionProp, 'AsyncConfiguration');
       const hasCustomContainerConfig = _.has(functionProp, 'CustomContainerConfig');
+      const serviceComponent = new Service(credentials, region);
 
       if (serviceProp.Log) {
         const logClient = await this.load('fc-logs-alibaba-component', 'Component');
-        deployComponent.setVariables('logClient', logClient);
-        deployComponent.setVariables('inputs', inputs);
-        deployComponent.setVariables('parameters', parameters);
+        serviceComponent.setVariables('logClient', logClient);
+        serviceComponent.setVariables('inputs', inputs);
+        serviceComponent.setVariables('parameters', parameters);
       }
 
       this.logger.info(`Waiting for service ${serviceName} ${deployAllConfig ? 'config to be updated' : 'to be deployed'}...`);
-      output.Service = await deployComponent.deploy(serviceName, serviceProp, hasFunctionAsyncConfig, hasCustomContainerConfig);
+      output.Service = await serviceComponent.deploy(serviceName, serviceProp, hasFunctionAsyncConfig, hasCustomContainerConfig);
       this.logger.success(`service ${serviceName} ${deployAllConfig ? 'config update success' : 'deploy success'}\n`);
     }
 

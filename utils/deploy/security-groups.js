@@ -48,7 +48,7 @@ class SecurityGroups extends Client {
     try {
       createRs = await this.ecsClient.request('CreateSecurityGroup', params, REQUESTOPTION)
     } catch (ex) {
-      new ServerlessError(ex, true);
+      new ServerlessError(ex);
     }
   
     return createRs.SecurityGroupId;

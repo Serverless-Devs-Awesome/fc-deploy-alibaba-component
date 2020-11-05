@@ -51,7 +51,7 @@ class RAM extends Client {
       if (ex.name === 'EntityNotExist.RoleError') {
         return false
       }
-      new ServerlessError(ex, true);
+      new ServerlessError(ex);
     }
   }
 
@@ -77,13 +77,13 @@ class RAM extends Client {
           })
           this.logger.info(`Role generated: ${roleName}`)
         } else {
-          new ServerlessError({ name: 'RoleNotExist', message: `role ${roleName} not exist` }, true);
+          new ServerlessError({ name: 'RoleNotExist', message: `role ${roleName} not exist` });
         }
       } catch (ex) {
         if (ex.code && ex.code.startsWith('InvalidParameter')) {
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         } else if (ex.code && ex.code === 'NoPermission') {
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         } else {
           this.logger.info(`Retry ${times} times`)
           retry(ex)
@@ -124,7 +124,7 @@ class RAM extends Client {
           })
         } catch (ex) {
           if (ex.code !== 'EntityNotExist.Policy') {
-            new ServerlessError(ex, true);
+            new ServerlessError(ex);
           } else { exists = false }
         }
 
@@ -146,7 +146,7 @@ class RAM extends Client {
         }
       } catch (ex) {
         if (ex.code && ex.code === 'NoPermission') {
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         }
         this.logger.info(`Retry ${times} times`);
         retry(ex);
@@ -173,7 +173,7 @@ class RAM extends Client {
         }
       } catch (ex) {
         if (ex.code && ex.code === 'NoPermission') {
-          new ServerlessError(ex, true);
+          new ServerlessError(ex);
         }
 
         this.logger.info(`Retry ${times} times`);
