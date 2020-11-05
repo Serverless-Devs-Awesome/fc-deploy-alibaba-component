@@ -8,6 +8,7 @@ const Logger = require('./utils/logger');
 const Service = require('./utils/deploy/service');
 const FcFunction = require('./utils/deploy/function');
 const Trigger = require('./utils/deploy/trigger');
+const TAG = require('./utils/deploy/tags');
 
 class FcComponent extends Component {
   constructor() {
@@ -95,6 +96,13 @@ class FcComponent extends Component {
       output.Triggers = await fcTrigger.deploy(properties, serviceName, functionName, triggerName, commands[0] === 'trigger');
     }
 
+    if (deployTags) {
+      const tag = new TAG(credentials, region);
+      const tagName = parameters.n || parameters.name;
+      output.Tags = await tag.deploy(`services/${serviceName}`, properties.Service.Tags, tagName);
+    }
+
+    return output;
   }
 }
 

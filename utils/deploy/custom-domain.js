@@ -5,6 +5,7 @@ const fs = require('fs')
 const requestP = require('request-promise')
 const Client = require('../client')
 const Logger = require('../logger')
+const ServerlessError = require('../error')
 
 class CustomDomain extends Client {
   constructor (credentials, region) {
@@ -121,7 +122,7 @@ class CustomDomain extends Client {
         await this.fcClient.deleteCustomDomain(domainName)
       } catch (e) {
         if (e.code !== 'DomainNameNotFound') {
-          throw new Error(e.message)
+          new ServerlessError(e)
         }
       }
       this.logger.success(`Delete domain successfully: ${domainName}`)

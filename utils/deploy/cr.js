@@ -1,5 +1,6 @@
 const Logger = require('../logger');
 const Client = require('../client');
+const ServerlessError = require('../error');
 
 
 class AliyunContainerRegistry extends Client {
@@ -45,10 +46,10 @@ class AliyunContainerRegistry extends Client {
         this.logger.error(JSON.stringify(e))
       }
 
-      throw new Error('Create namespace failed.')
+      new ServerlessError({ message: 'Create namespace failed.' })
     }
 
-    throw new Error(`Failed to create namespace:${namespace}, respones: ` + response)
+    new ServerlessError({ message: `Failed to create namespace:${namespace}, respones: ` + response })
   }
 
   async namespaceExists (namespace) {
@@ -67,8 +68,7 @@ class AliyunContainerRegistry extends Client {
       if (e.result && e.result.code === 'NAMESPACE_NOT_EXIST') {
         return false
       }
-
-      throw e
+      new ServerlessError(e)
     }
   }
 
