@@ -9,6 +9,7 @@ const Service = require('./utils/deploy/service');
 const FcFunction = require('./utils/deploy/function');
 const Trigger = require('./utils/deploy/trigger');
 const TAG = require('./utils/deploy/tags');
+const { CustomDomain } = require('./utils/deploy/custom-domain');
 
 class FcComponent extends Component {
   constructor() {
@@ -100,6 +101,32 @@ class FcComponent extends Component {
       const tag = new TAG(credentials, region);
       const tagName = parameters.n || parameters.name;
       output.Tags = await tag.deploy(`services/${serviceName}`, properties.Service.Tags, tagName);
+    }
+
+    if (deployDomain) {
+      const fcDomain = new CustomDomain(credentials, region);
+      let triggers = properties.Function.Triggers;
+      if (!_.isArray(triggers)) { return }
+
+      triggers = triggers.filter(trigger => trigger.Type === 'HTTP' && trigger.Parameters && trigger.Parameters.Domains);
+      const triggerConfig = [];
+      const onlyDomainName = parameters.d || parameters.domain;
+      for (const trigger of triggers) {
+        const t = await fcDomain.deploy(
+          trigger.Parameters.Domains,
+          serviceName,
+          functionName,
+          onlyDomainName
+        )
+
+        triggerConfig.push({
+          TriggerName: trigger.Name,
+          Domains: t
+        })
+      }
+      if (!_.isEmpty(triggerConfig)) {
+        output.Domains = triggerConfig;
+      }
     }
 
     return output;
