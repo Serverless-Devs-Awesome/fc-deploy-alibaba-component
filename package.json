@@ -14,8 +14,13 @@
     "@alicloud/pop-core": "^1.7.10",
     "@alicloud/ram": "^1.0.0",
     "@serverless-devs/s-core": "0.0.22",
+    "@serverless-devs/s-zip": "0.0.8",
+    "ali-oss": "^6.11.2",
+    "fs-extra": "^9.0.1",
     "js-yaml": "^3.14.0",
     "lodash": "^4.17.20",
-    "promise-retry": "^2.0.1"
+    "moment": "^2.29.1",
+    "promise-retry": "^2.0.1",
+    "util": "^0.12.3"
   }
 }

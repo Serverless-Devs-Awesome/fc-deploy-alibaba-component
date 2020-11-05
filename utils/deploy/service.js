@@ -3,7 +3,7 @@ const _ = require('lodash');
 const yaml = require('js-yaml');
 const fs = require('fs');
 
-const Client = require('./client');
+const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
 const Ram = require('./ram');
@@ -14,7 +14,7 @@ const {
   DEFAULT_NAS_CONFIG
 } = require('../static')
 
-class Deploy extends Client {
+class Service extends Client {
   constructor (credentials, region) {
     super(credentials, region);
     this.fcClient = this.buildFcClient();
@@ -338,4 +338,4 @@ class Deploy extends Client {
   }
 }
 
-module.exports = Deploy;
+module.exports = Service;

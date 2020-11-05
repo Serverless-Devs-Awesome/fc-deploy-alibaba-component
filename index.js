@@ -3,9 +3,10 @@ const { Component } = require('@serverless-devs/s-core');
 
 const getHelp = require('./utils/help');
 const ServerlessError = require('./utils/error');
-const Service = require('./utils/deploy/service');
 const Logger = require('./utils/logger');
-const { isLogConfigAuto } = require('./utils/deploy/utils');
+
+const Service = require('./utils/deploy/service');
+const FcFunction = require('./utils/deploy/function');
 
 class FcComponent extends Component {
   constructor() {
@@ -66,6 +67,25 @@ class FcComponent extends Component {
       this.logger.info(`Waiting for service ${serviceName} ${deployAllConfig ? 'config to be updated' : 'to be deployed'}...`);
       output.Service = await serviceComponent.deploy(serviceName, serviceProp, hasFunctionAsyncConfig, hasCustomContainerConfig);
       this.logger.success(`service ${serviceName} ${deployAllConfig ? 'config update success' : 'deploy success'}\n`);
+    }
+
+    if (deployFunction) {
+      const fcFunction = new FcFunction(credentials, region);
+
+      const onlyDelpoyCode = (parameters.code && !deployAll);
+      const onlyDelpoyConfig = (parameters.config || deployAllConfig);
+
+      this.logger.info(`Waiting for function ${functionName} ${onlyDelpoyConfig ? 'config to be updated' : 'to be deployed'}...`);
+      output.Function = await fcFunction.deploy({
+        projectName,
+        serviceName,
+        serviceProp,
+        functionName,
+        functionProp,
+        onlyDelpoyCode,
+        onlyDelpoyConfig
+      })
+      this.logger.success(`function ${functionName} ${onlyDelpoyConfig || deployAllConfig ? 'config update success' : 'deploy success'}\n`);
     }
 
   }

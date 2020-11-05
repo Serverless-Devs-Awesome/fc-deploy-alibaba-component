@@ -3,6 +3,7 @@
 const FC = require('@alicloud/fc2');
 const RAM = require('@alicloud/ram');
 const Pop = require('@alicloud/pop-core');
+const OSS = require('ali-oss');
 
 FC.prototype.getAccountSettings = function (options = {}, headers = {}) {
   return this.get('/account-settings', options, headers)
@@ -17,6 +18,16 @@ class Client {
     this.accessKeyID = credentials.AccessKeyID
     this.accessKeySecret = credentials.AccessKeySecret
     this.stsToken = credentials.SecurityToken
+  }
+
+  buildOssClient (bucketName) {
+    return new OSS({
+      region: this.region,
+      accessKeyId: this.accessKeyID,
+      accessKeySecret: this.accessKeySecret,
+      stsToken: this.stsToken,
+      bucket: bucketName
+    })
   }
 
   buildFcClient () {
@@ -74,6 +85,15 @@ class Client {
       opts: {
         timeout: 60 * 1000
       }
+    })
+  }
+
+  buildRoaClient () {
+    return new ROAClient({
+      accessKeyId: this.accessKeyID,
+      accessKeySecret: this.accessKeySecret,
+      endpoint: `https://cr.${this.region}.aliyuncs.com`,
+      apiVersion: '2016-06-07'
     })
   }
 }

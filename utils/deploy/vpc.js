@@ -1,5 +1,5 @@
 const _ = require('lodash');
-const Client = require('./client');
+const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
 const { sleep } = require('./utils');
