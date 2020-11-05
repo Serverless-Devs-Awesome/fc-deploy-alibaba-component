@@ -4,13 +4,14 @@ const _ = require('lodash');
 
 const util = require('util');
 const http = require('http');
-const RAM = require('../ram');
-const Client = require('./client');
+const RAM = require('./ram');
+const Client = require('../client');
 const ServerlessError = require('../error');
 
-// const { CustomDomain } = require('./customDomain')
+const { CustomDomain } = require('./custom-domain');
 const Logger = require('../logger');
-const { sleep } = require('../utils');
+const defaultPolice = require('../defaultPolice');
+const { sleep, normalizeRoleOrPoliceName } = require('../utils');
 
 const triggerTypeMapping = {
   Datahub: 'datahub',
@@ -65,260 +66,94 @@ class Trigger extends Client {
   }
 
   async getSourceArn (triggerType, triggerParameters) {
-    if (triggerType === 'Log') {
-      return `acs:log:${this.region}:${this.accountId}:project/${triggerParameters.LogConfig.Project}`
-    } else if (triggerType === 'RDS') {
-      return `acs:rds:${this.region}:${this.accountId}:dbinstance/${triggerParameters.InstanceId}`
-    } else if (triggerType === 'MNSTopic') {
+    const mnsTopic = () => {
       if (triggerParameters.Region !== undefined) {
-        return `acs:mns:${triggerParameters.Region}:${this.accountId}:/topics/${triggerParameters.TopicName}`
+        return `acs:mns:${triggerParameters.Region}:${this.accountId}:/topics/${triggerParameters.TopicName}`;
       }
-      return `acs:mns:${this.region}:${this.accountId}:/topics/${triggerParameters.TopicName}`
-    } else if (triggerType === 'TableStore') {
-      return `acs:ots:${this.region}:${this.accountId}:instance/${triggerParameters.InstanceName}/table/${triggerParameters.TableName}`
-    } else if (triggerType === 'OSS') {
-      return `acs:oss:${this.region}:${this.accountId}:${triggerParameters.Bucket}`
-    } else if (triggerType === 'CDN') {
-      return `acs:cdn:*:${this.accountId}`
+      return `acs:mns:${this.region}:${this.accountId}:/topics/${triggerParameters.TopicName}`;
+    }
+
+    const sourceArnMap = {
+      Log: () => `acs:log:${this.region}:${this.accountId}:project/${triggerParameters.LogConfig.Project}`,
+      RDS: () => `acs:rds:${this.region}:${this.accountId}:dbinstance/${triggerParameters.InstanceId}`,
+      MNSTopic: mnsTopic,
+      TableStore: () => `acs:ots:${this.region}:${this.accountId}:instance/${triggerParameters.InstanceName}/table/${triggerParameters.TableName}`,
+      OSS: () => `acs:oss:${this.region}:${this.accountId}:${triggerParameters.Bucket}`,
+      CDN: () => `acs:cdn:*:${this.accountId}`
+    }
+
+    if (sourceArnMap[triggerType]) {
+      return sourceArnMap[triggerType]();
     }
   }
 
   async makeInvocationRole (serviceName, functionName, triggerType, qualifier) {
-    const ram = new RAM(this.credentials)
-    if (triggerType === 'Log') {
-      const invocationRoleName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      const invocationRole = await ram.makeRole(
-        invocationRoleName,
-        true,
-        'Used for fc invocation',
-        {
-          Statement: [
-            {
-              Action: 'sts:AssumeRole',
-              Effect: 'Allow',
-              Principal: {
-                Service: ['log.aliyuncs.com']
-              }
-            }
-          ],
-          Version: '1'
-        }
-      )
-      const policyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(policyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['fc:InvokeFunction'],
-            Resource: `acs:fc:*:*:services/${serviceName}/functions/*`,
-            Effect: 'Allow'
-          },
-          {
-            Action: [
-              'log:Get*',
-              'log:List*',
-              'log:PostLogStoreLogs',
-              'log:CreateConsumerGroup',
-              'log:UpdateConsumerGroup',
-              'log:DeleteConsumerGroup',
-              'log:ListConsumerGroup',
-              'log:ConsumerGroupUpdateCheckPoint',
-              'log:ConsumerGroupHeartBeat',
-              'log:GetConsumerGroupCheckPoint'
-            ],
-            Resource: '*',
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom')
-      return invocationRole.Role
-    } else if (triggerType === 'RDS' || triggerType === 'MNSTopic') {
-      const invocationRoleName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      var tMap = {
-        RDS: 'rds',
-        MNSTopic: 'mns'
-      }
-      var principalService = util.format('%s.aliyuncs.com', tMap[triggerType])
-      const invocationRole = await ram.makeRole(
-        invocationRoleName,
-        true,
-        'Used for fc invocation',
-        {
-          Statement: [
-            {
-              Action: 'sts:AssumeRole',
-              Effect: 'Allow',
-              Principal: {
-                Service: [principalService]
-              }
-            }
-          ],
-          Version: '1'
-        }
-      )
-      const policyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(policyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['fc:InvokeFunction'],
-            Resource: `acs:fc:*:*:services/${serviceName}/functions/*`,
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom')
-      return invocationRole.Role
-    } else if (triggerType === 'TableStore') {
-      const invocationRoleName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      const invocationRole = await ram.makeRole(
-        invocationRoleName,
-        true,
-        'Used for fc invocation',
-        {
-          Statement: [
-            {
-              Action: 'sts:AssumeRole',
-              Effect: 'Allow',
-              Principal: {
-                RAM: ['acs:ram::1604337383174619:root']
-              }
-            }
-          ],
-          Version: '1'
-        }
-      )
-      const invkPolicyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(invkPolicyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['fc:InvokeFunction'],
-            Resource: '*',
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(invkPolicyName, invocationRoleName, 'Custom')
-      const otsReadPolicyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(otsReadPolicyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['ots:BatchGet*', 'ots:Describe*', 'ots:Get*', 'ots:List*'],
-            Resource: '*',
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(otsReadPolicyName, invocationRoleName, 'Custom')
-      return invocationRole.Role
-    } else if (triggerType === 'OSS') {
-      const invocationRoleName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      const invocationRole = await ram.makeRole(
-        invocationRoleName,
-        true,
-        'Used for fc invocation',
-        {
-          Statement: [
-            {
-              Action: 'sts:AssumeRole',
-              Effect: 'Allow',
-              Principal: {
-                Service: ['oss.aliyuncs.com']
-              }
-            }
-          ],
-          Version: '1'
-        }
-      )
-      const policyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(policyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['fc:InvokeFunction'],
-            Resource: qualifier
-              ? `acs:fc:*:*:services/${serviceName}.*/functions/*`
-              : `acs:fc:*:*:services/${serviceName}/functions/*`,
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom')
-      return invocationRole.Role
-    } else if (triggerType === 'CDN') {
-      const invocationRoleName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      const invocationRole = await ram.makeRole(
-        invocationRoleName,
-        true,
-        'Used for fc invocation',
-        {
-          Statement: [
-            {
-              Action: 'sts:AssumeRole',
-              Effect: 'Allow',
-              Principal: {
-                Service: ['cdn.aliyuncs.com']
-              }
-            }
-          ],
-          Version: '1'
-        }
-      )
-      const policyName = ram.normalizeRoleOrPoliceName(
-        `Fc-${serviceName}-${functionName}`
-      )
-      await ram.makePolicy(policyName, {
-        Version: '1',
-        Statement: [
-          {
-            Action: ['fc:InvokeFunction'],
-            Resource: `acs:fc:*:*:services/${serviceName}/functions/*`,
-            Effect: 'Allow'
-          }
-        ]
-      })
-      await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom')
-      return invocationRole.Role
+    const ram = new RAM(this.credentials);
+
+    const invocationRoleName = normalizeRoleOrPoliceName(`Fc-${serviceName}-${functionName}`);
+    const policyName = normalizeRoleOrPoliceName(`Fc-${serviceName}-${functionName}`);
+    const description = 'Used for fc invocation';
+
+    let invocationRole;
+    switch (triggerType) {
+      case 'log':
+        invocationRole = await ram.makeRole(invocationRoleName, true, description, defaultPolice.logRolePolicy);
+        await ram.makePolicy(policyName, defaultPolice.getLogTriggerPolicy(serviceName));
+        await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom');
+        break;
+      case 'RDS':
+      case 'MNSTopic':
+        const tMap = { RDS: 'rds', MNSTopic: 'mns' };
+        const principalService = util.format('%s.aliyuncs.com', tMap[triggerType]);
+        const mnsOrRdsTriggerPolicy = defaultPolice.getMnsOrRdsTriggerPolicy(principalService);
+        invocationRole = await ram.makeRole(invocationRoleName, true, description, mnsOrRdsTriggerPolicy);
+
+        await ram.makePolicy(policyName, defaultPolice.getInvokeFunctionPolicy(serviceName));
+        await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom');
+  
+        break;
+      case 'TableStore':
+        const invkPolicyName = normalizeRoleOrPoliceName(`Fc-${serviceName}-${functionName}`);
+        const otsReadPolicyName = normalizeRoleOrPoliceName(`Fc-${serviceName}-${functionName}`);
+
+        invocationRole = await ram.makeRole(invocationRoleName, true, description, defaultPolice.tableStoreRolePolicy);
+        await ram.makePolicy(invkPolicyName, defaultPolice.getInvokeFunctionPolicy());
+        await ram.attachPolicyToRole(invkPolicyName, invocationRoleName, 'Custom');
+        await ram.makePolicy(otsReadPolicyName, defaultPolice.otsReadPolicy);
+        await ram.attachPolicyToRole(otsReadPolicyName, invocationRoleName, 'Custom');
+        break;
+      case 'OSS':
+        invocationRole = await ram.makeRole(invocationRoleName, true, description, defaultPolice.ossTriggerPolicy);
+        await ram.makePolicy(policyName, defaultPolice.getInvokeFunctionPolicy(serviceName, qualifier));
+        await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom');
+        break;
+      case 'CDN':
+        invocationRole = await ram.makeRole(invocationRoleName, true, description, defaultPolice.cdnTriggerPolicy);
+        await ram.makePolicy(policyName, defaultPolice.getInvokeFunctionPolicy(serviceName));
+        await ram.attachPolicyToRole(policyName, invocationRoleName, 'Custom');
+        break;
     }
-    return false
+
+    if (invocationRole) {
+      return invocationRole.Role;
+    }
+    return false;
   }
 
   async deployTrigger (serviceName, functionName, trigger, isOnlyDeployTrigger) {
-    const triggerType = trigger.Type
-    const triggerName = trigger.Name
+    const triggerType = trigger.Type;
+    const triggerName = trigger.Name;
     const output = {
       Name: triggerName,
       Type: triggerType
-    }
-    const triggerParameters = trigger.Parameters
+    };
+    const triggerParameters = trigger.Parameters;
     const parameters = {
       triggerType: triggerTypeMapping[trigger.Type]
-    }
-    if (triggerType === 'OSS') {
-      parameters.triggerConfig = {
+    };
+
+    const triggerConfigMap = {
+      OSS: () => ({
         events: triggerParameters.Events,
         filter: {
           key: {
@@ -326,20 +161,17 @@ class Trigger extends Client {
             suffix: triggerParameters.Filter.Suffix
           }
         }
-      }
-    } else if (triggerType === 'Timer') {
-      parameters.triggerConfig = {
+      }),
+      Timer: () => ({
         payload: triggerParameters.Payload,
         cronExpression: triggerParameters.CronExpression,
         enable: !!triggerParameters.Enable
-      }
-    } else if (triggerType === 'HTTP') {
-      parameters.triggerConfig = {
+      }),
+      HTTP: () => ({
         authType: triggerParameters.AuthType.toLowerCase(),
         methods: triggerParameters.Methods
-      }
-    } else if (triggerType === 'Log') {
-      parameters.triggerConfig = {
+      }),
+      Log: () => ({
         sourceConfig: {
           logstore: triggerParameters.SourceConfig.LogStore
         },
@@ -353,70 +185,56 @@ class Trigger extends Client {
         },
         functionParameter: triggerParameters.FunctionParameter || {},
         Enable: !!triggerParameters.Enable
-      }
-    } else if (triggerType === 'RDS') {
-      parameters.triggerConfig = {
+      }),
+      RDS: () => ({
         subscriptionObjects: triggerParameters.SubscriptionObjects,
         retry: triggerParameters.Retry,
         concurrency: triggerParameters.Concurrency,
         eventFormat: triggerParameters.EventFormat
-      }
-    } else if (triggerType === 'MNSTopic') {
-      parameters.triggerConfig = {
+      }),
+      MNSTopic: () => ({
         NotifyContentFormat: triggerParameters.NotifyContentFormat
           ? triggerParameters.NotifyContentFormat
           : 'STREAM',
         NotifyStrategy: triggerParameters.NotifyStrategy
           ? triggerParameters.NotifyStrategy
-          : 'BACKOFF_RETRY'
-      }
-      if (triggerParameters.FilterTag) {
-        parameters.triggerConfig.FilterTag = triggerParameters.FilterTag
-      }
-    } else if (triggerType === 'TableStore') {
-      parameters.triggerConfig = {}
-    } else if (triggerType === 'CDN') {
-      parameters.triggerConfig = {
+          : 'BACKOFF_RETRY',
+        FilterTag: triggerParameters.FilterTag ? triggerParameters.FilterTag : undefined
+      }),
+      TableStore: () => ({}),
+      CDN: () => ({
         eventName: triggerParameters.EventName,
         eventVersion: triggerParameters.EventVersion,
         notes: triggerParameters.Notes,
         filter: _.mapKeys(triggerParameters.Filter, (value, key) => {
           return _.lowerFirst(key)
         })
-      }
+      })
+    };
+    if (triggerConfigMap[triggerType]) {
+      parameters.triggerConfig = triggerConfigMap[triggerType]();
     }
 
-    let invocationRoleArn = triggerParameters.InvocationRole
+    let invocationRoleArn = triggerParameters.InvocationRole;
     if (!invocationRoleArn) {
-      const invocationRole = await this.makeInvocationRole(
-        serviceName,
-        functionName,
-        triggerType,
-        parameters.Qualifier
-      )
+      const invocationRole = await this.makeInvocationRole(serviceName, functionName, triggerType, parameters.Qualifier);
       if (invocationRole) {
-        invocationRoleArn = invocationRole.Arn
+        invocationRoleArn = invocationRole.Arn;
       }
     }
     if (invocationRoleArn) {
-      Object.assign(parameters, {
-        invocationRole: invocationRoleArn
-      })
+      parameters.invocationRole = invocationRoleArn;
     }
 
-    const sourceArn = await this.getSourceArn(triggerType, triggerParameters)
+    const sourceArn = await this.getSourceArn(triggerType, triggerParameters);
     if (sourceArn) {
-      Object.assign(parameters, {
-        sourceArn: sourceArn
-      })
+      parameters.sourceArn = sourceArn;
     }
 
     if (triggerParameters.Qualifier) {
-      Object.assign(parameters, {
-        qualifier: `${triggerParameters.Qualifier}`
-      })
+      parameters.qualifier = `${triggerParameters.Qualifier}`;
     }
-    const endPoint = `https://${this.accountId}.${this.region}.fc.aliyuncs.com/2016-08-15/proxy/${serviceName}/${functionName}/`
+    const endPoint = `https://${this.accountId}.${this.region}.fc.aliyuncs.com/2016-08-15/proxy/${serviceName}/${functionName}/`;
 
     // 部署 http 域名
     const deployDomain = async (domains) => {
@@ -424,29 +242,30 @@ class Trigger extends Client {
         return this.displayDomainInfo(endPoint, triggerName, triggerParameters, endPoint)
       }
       try {
-        let domainNames
+        let domainNames;
         for (let i = 0; i <= 3; i++) {
-          const customDomain = new CustomDomain(this.credentials, this.region)
-          domainNames = await customDomain.deploy(domains, serviceName, functionName)
+          const customDomain = new CustomDomain(this.credentials, this.region);
+          domainNames = await customDomain.deploy(domains, serviceName, functionName);
 
-          output.Domains = domainNames || endPoint
+          output.Domains = domainNames || endPoint;
           if (output.Domains && output.Domains.length > 0) {
             for (let j = 0; j < output.Domains.length; j++) {
               if (String(output.Domains[j]).endsWith('.test.functioncompute.com')) {
-                const tempState = await this.getAutoDomainState(output.Domains[j])
+                const tempState = await this.getAutoDomainState(output.Domains[j]);
                 if (tempState !== undefined && !String(tempState).includes('DomainNameNotFound')) {
-                  i = 5
+                  i = 5;
                 }
               } else {
-                await sleep(2000)
+                await sleep(2000);
               }
             }
           }
         }
-        domainNames.forEach(domainName => this.displayDomainInfo(domainName, triggerName, triggerParameters, endPoint, true))
+        domainNames.forEach(domainName => this.displayDomainInfo(domainName, triggerName, triggerParameters, endPoint, true));
       } catch (e) {
-        this.displayDomainInfo(endPoint, triggerName, triggerParameters, endPoint)
-        output.Domains = endPoint
+        this.logger.log(e);
+        this.displayDomainInfo(endPoint, triggerName, triggerParameters, endPoint);
+        output.Domains = endPoint;
       }
     }
 
@@ -454,80 +273,31 @@ class Trigger extends Client {
       await this.fcClient.getTrigger(serviceName, functionName, triggerName)
       if (triggerType === 'TableStore' || triggerType === 'MNSTopic') {
         this.logger.info('The trigger type: TableStore/MNSTopic does not support updates.')
-        return output
+        return output;
       } else {
         // 更新触发器
         try {
-          await this.fcClient.updateTrigger(serviceName, functionName, triggerName, parameters)
+          await this.fcClient.updateTrigger(serviceName, functionName, triggerName, parameters);
           if (triggerType === 'HTTP' && !isOnlyDeployTrigger) {
-            await deployDomain(triggerParameters.Domains)
+            await deployDomain(triggerParameters.Domains);
           }
-          return output
+          return output;
         } catch (ex) {
-          throw new Error(
-            `${serviceName}:${functionName}@${triggerType}${triggerName} update failed: ${ex.message}`
-          )
+          new ServerlessError({ message: `${serviceName}:${functionName}@${triggerType}${triggerName} update failed: ${ex.message}` });
         }
       }
     } catch (e) {
       // 创建触发器
       try {
-        parameters.triggerName = triggerName
-        await this.fcClient.createTrigger(serviceName, functionName, parameters)
+        parameters.triggerName = triggerName;
+        await this.fcClient.createTrigger(serviceName, functionName, parameters);
         if (triggerType === 'HTTP' && !isOnlyDeployTrigger) {
-          await deployDomain(triggerParameters.Domains)
+          await deployDomain(triggerParameters.Domains);
         }
-        return output
+        return output;
       } catch (ex) {
-        throw new Error(
-          `${serviceName}:${functionName}@${triggerType}-${triggerName} create failed: ${ex.message}`
-        )
+        new ServerlessError({ message: `${serviceName}:${functionName}@${triggerType}-${triggerName} create failed: ${ex.message}` });
       }
-    }
-  }
-
-  /**
-   * Remove trigger
-   * @param {*} serviceName
-   * @param {*} functionName
-   * @param {*} triggerList : will delete all triggers if not specified
-   */
-  async remove (serviceName, functionName, parameters) {
-    const onlyRemoveTriggerName = parameters ? (parameters.n || parameters.name) : false
-    const triggerList = []
-
-    if (onlyRemoveTriggerName) {
-      triggerList.push(onlyRemoveTriggerName)
-    } else {
-      try {
-        const listTriggers = await this.fcClient.listTriggers(serviceName, functionName)
-        const curTriggerList = listTriggers.data
-        for (let i = 0; i < curTriggerList.triggers.length; i++) {
-          triggerList.push(curTriggerList.triggers[i].triggerName)
-        }
-      } catch (ex) {
-        if (ex.code === 'ServiceNotFound') {
-          this.logger.info('Service not exists, skip deleting trigger')
-          return
-        }
-        if (ex.code === 'FunctionNotFound') {
-          this.logger.info('Function not exists, skip deleting trigger')
-          return
-        }
-        throw new Error(`Unable to get triggers: ${ex.message}`)
-      }
-    }
-
-    // 删除触发器
-    for (let i = 0; i < triggerList.length; i++) {
-      this.logger.info(`Deleting trigger: ${triggerList[i]}`)
-      try {
-        await this.fcClient.deleteTrigger(serviceName, functionName, triggerList[i])
-      } catch (ex) {
-        throw new Error(`Unable to delete trigger: ${ex.message}`)
-      }
-
-      this.logger.success(`Delete trigger successfully: ${triggerList[i]}`)
     }
   }
 
@@ -558,27 +328,27 @@ class Trigger extends Client {
       }
 
       if (triggerName) {
-        const onlyDeployTriggerConfig = _.filter(properties.Function.Triggers, ({ Name }) => Name === triggerName)
+        const onlyDeployTriggerConfig = _.filter(properties.Function.Triggers, ({ Name }) => Name === triggerName);
         if (onlyDeployTriggerConfig.length < 1) {
-          throw new Error(`${triggerName} not found.`)
+          new ServerlessError({ message: `${triggerName} not found.` });
         }
         if (onlyDeployTriggerConfig.length > 1) {
-          throw new Error(`${triggerName} repeated statement.`)
+          new ServerlessError({ message: `${triggerName} repeated statement.` });
         }
         await handlerDeployTrigger(onlyDeployTriggerConfig[0], triggerName)
       } else {
         for (let i = 0; i < properties.Function.Triggers.length; i++) {
-          const deployTriggerName = properties.Function.Triggers[i].Name
-          await handlerDeployTrigger(properties.Function.Triggers[i], deployTriggerName)
+          const deployTriggerName = properties.Function.Triggers[i].Name;
+          await handlerDeployTrigger(properties.Function.Triggers[i], deployTriggerName);
         }
       }
     }
 
     // 删除触发器
     for (let i = 0; i < releaseTriggerList.length; i++) {
-      if (thisTriggerList.indexOf(releaseTriggerList[i]) === -1) {
-        this.logger.info(`Deleting trigger: ${releaseTriggerList[i]}.`)
-        await this.fcClient.deleteTrigger(serviceName, functionName, releaseTriggerList[i])
+      if (!thisTriggerList.includes(releaseTriggerList[i])) {
+        this.logger.info(`Deleting trigger: ${releaseTriggerList[i]}.`);
+        await this.fcClient.deleteTrigger(serviceName, functionName, releaseTriggerList[i]);
       }
     }
 

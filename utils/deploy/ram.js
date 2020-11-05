@@ -2,25 +2,11 @@
 
 const _ = require('lodash')
 
-const Client = require('../client')
-const { promiseRetry } = require('../utils')
-const Logger = require('../logger')
-const ServerlessError = require('../error')
-
-const assumeRolePolicyDefault = {
-  Statement: [
-    {
-      Action: 'sts:AssumeRole',
-      Effect: 'Allow',
-      Principal: {
-        Service: [
-          'fc.aliyuncs.com'
-        ]
-      }
-    }
-  ],
-  Version: '1'
-};
+const Client = require('../client');
+const { promiseRetry } = require('../utils');
+const Logger = require('../logger');
+const ServerlessError = require('../error');
+const { assumeRolePolicyDefault } = require('../defaultPolice');
 
 class RAM extends Client {
   constructor (credentials) {
