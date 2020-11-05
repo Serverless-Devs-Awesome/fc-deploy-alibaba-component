@@ -78,7 +78,7 @@ class SecurityGroups extends Client {
       NicType: 'intranet'
     }
 
-    return await this.ecsClient.request('AuthorizeSecurityGroup', params, requestOption);
+    return await this.ecsClient.request('AuthorizeSecurityGroup', params, REQUESTOPTION);
   }
 }
 

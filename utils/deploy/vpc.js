@@ -81,7 +81,7 @@ class Vpc extends Client {
 
   async createVpc (vpcName) {
     const createParams = {
-      RegionId: region,
+      RegionId: this.region,
       CidrBlock: '10.0.0.0/8',
       EnableIpv6: false,
       VpcName: vpcName,
@@ -100,7 +100,7 @@ class Vpc extends Client {
   
     this.logger.log(`create vpc rs is: ${JSON.stringify(createRs)}`);
   
-    await this.waitVpcUntilAvaliable(vpcClient, region, vpcId);
+    await this.waitVpcUntilAvaliable(vpcId);
   
     return vpcId
   }
@@ -128,11 +128,11 @@ class Vpc extends Client {
     // create security group
     if (_.isEmpty(defaultSecurityGroup)) {
       this.logger.info('Generating default security group');
-      const securityGroupId = await securityGroup.createSecurityGroup(ecsClient, region, vpcId, DEFAULTSECURITYGROUPNAME);
+      const securityGroupId = await securityGroup.createSecurityGroup(vpcId, DEFAULTSECURITYGROUPNAME);
   
       this.logger.success(`Default security group generated, securityGroupId is: ${securityGroupId}`);
       this.logger.info('Generating default security group rules');
-      await securityGroup.authDefaultSecurityGroupRules(ecsClient, region, securityGroupId);
+      await securityGroup.authDefaultSecurityGroupRules(securityGroupId);
       this.logger.info('Security group rules generated');
       return securityGroupId;
     }

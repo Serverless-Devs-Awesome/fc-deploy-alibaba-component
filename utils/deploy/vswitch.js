@@ -38,7 +38,7 @@ class Vswitch extends Client {
         }
       }
     }
-    this.logger.info(`could not find ${searchVSwtichName} from ${vswitchIds} for region ${region}.`);
+    this.logger.info(`could not find ${searchVSwtichName} from ${vswitchIds} for region ${this.region}.`);
     return null;
   }
 
@@ -76,11 +76,11 @@ class Vswitch extends Client {
   
 
   async selectAllowedVSwitchZone () {
-    const fcAllowedZones = await getFcAllowedZones();
-    const vpcZones = await describeVpcZones();
+    const fcAllowedZones = await this.getFcAllowedZones();
+    const vpcZones = await this.describeVpcZones();
     const nasZones = await this.describeNasZones();
   
-    const usedZoneId = await selectVSwitchZoneId(fcAllowedZones, vpcZones, nasZones)
+    const usedZoneId = await this.selectVSwitchZoneId(fcAllowedZones, vpcZones, nasZones)
     if (!usedZoneId) {
       new ServerlessError({
         message: 'no availiable zone for vswitch'
@@ -90,13 +90,36 @@ class Vswitch extends Client {
     return usedZoneId
   }
 
+  async createVSwitch ({
+    region,
+    vpcId,
+    zoneId,
+    vswitchName
+  }) {
+    var params = {
+      RegionId: region,
+      VpcId: vpcId,
+      ZoneId: zoneId,
+      CidrBlock: '10.20.0.0/16',
+      VSwitchName: vswitchName,
+      Description: 'default vswitch created by fc fun'
+    };
+
+    this.logger.log(`createVSwitch params is ${JSON.stringify(params)}`);
+  
+    const createRs = await this.vpcClient.request('CreateVSwitch', params, REQUESTOPTION);
+  
+    return createRs.VSwitchId
+  }
+  
+
   async createDefaultVSwitch (vpcId, vswitchName) {
-    const vswitchZoneId = await selectAllowedVSwitchZone();
+    const vswitchZoneId = await this.selectAllowedVSwitchZone();
   
     let vswitchId;
     try {
       // 创建 vswitch
-      vswitchId = await createVSwitch(this.vpcClient, {
+      vswitchId = await this.createVSwitch({
         region: this.region,
         vpcId,
         zoneId: vswitchZoneId,

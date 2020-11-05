@@ -4,6 +4,10 @@ const FC = require('@alicloud/fc2');
 const RAM = require('@alicloud/ram');
 const Pop = require('@alicloud/pop-core');
 
+FC.prototype.getAccountSettings = function (options = {}, headers = {}) {
+  return this.get('/account-settings', options, headers)
+}
+
 class Client {
   constructor (credentials, region) {
     this.region = region
