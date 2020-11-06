@@ -117,7 +117,17 @@ async function describeVSwitchAttributes (vpcClient, region, vswitchId) {
     RegionId: region,
     VSwitchId: vswitchId
   }
-  return await vpcClient.request('DescribeVSwitchAttributes', params, requestOption)
+  return await vpcClient.request('DescribeVSwitchAttributes', params, REQUESTOPTION)
+}
+
+function convertZones (nasZones, zones, storageType = 'Performance') {
+  const zoneId = nasZones.ZoneId
+  const vswitchId = zones.filter(f => { return f.zoneId === zoneId })
+  return {
+    zoneId,
+    vswitchId: _.head(vswitchId).vswitchId,
+    storageType
+  }
 }
 
 function transformToolConfigToFcClientConfig (nasConfig) {
@@ -160,6 +170,7 @@ module.exports = {
   describeVpcZones,
   describeNasZones,
   describeVSwitchAttributes,
+  convertZones,
   transformToolConfigToFcClientConfig,
   sleep,
   promiseRetry

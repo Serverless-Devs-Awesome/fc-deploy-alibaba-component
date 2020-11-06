@@ -7,8 +7,9 @@ const Client = require('../client');
 const Logger = require('../logger');
 const ServerlessError = require('../error');
 const Ram = require('./ram');
-const utils = require('../utils');
 const Vpc = require('./vpc');
+const Nas = require('./nas');
+const utils = require('../utils');
 const {
   DEFAULT_VPC_CONFIG,
   DEFAULT_NAS_CONFIG
@@ -273,8 +274,15 @@ class Service extends Client {
     options.vpcConfig = vpcConfig || DEFAULT_VPC_CONFIG;
 
     if (isNasAuto) {
-      this.logger.warn('暂时不支持 nas auto 了.');
-      nasConfig = undefined; 
+      const vpcId = vpcConfig.vpcId || vpcConfig.VpcId;
+      const vswitchIds = vpcConfig.vswitchIds || vpcConfig.VSwitchIds;
+
+      this.logger.info(`Using 'Nas: Auto'`);
+      const nas = new Nas(this.credentials, this.region);
+      nasConfig = await nas.generateAutoNasConfig(serviceName, vpcId, vswitchIds, nasConfig.UserId, nasConfig.GroupId, nasConfig.FcDir, nasConfig.LocalDir);
+
+      const saveConfig = nas.transformClientConfigToToolConfig(nasConfig)
+      await this.saveConfigToTemplate('Nas', saveConfig)
     } else {
       nasConfig = utils.transformToolConfigToFcClientConfig(nasConfig);
     }

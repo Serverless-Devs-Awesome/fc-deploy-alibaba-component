@@ -43,7 +43,6 @@ class Vswitch extends Client {
   
     return (_.head(sortedZones) || {}).ZoneId
   }
-  
 
   async selectAllowedVSwitchZone () {
     const fcAllowedZones = await utils.getFcAllowedZones(this.fcClient, this.region);
@@ -82,7 +81,6 @@ class Vswitch extends Client {
     return createRs.VSwitchId
   }
   
-
   async createDefaultVSwitch (vpcId, vswitchName) {
     const vswitchZoneId = await this.selectAllowedVSwitchZone();
   
@@ -99,7 +97,7 @@ class Vswitch extends Client {
       new ServerlessError(ex);
     }
     return vswitchId;
-  }
+  }  
 }
 
 module.exports = Vswitch;
