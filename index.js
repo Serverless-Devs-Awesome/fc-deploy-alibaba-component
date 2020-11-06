@@ -104,28 +104,29 @@ class FcComponent extends Component {
     }
 
     if (deployDomain) {
-      const fcDomain = new CustomDomain(credentials, region);
       let triggers = properties.Function.Triggers;
-      if (!_.isArray(triggers)) { return }
-
-      triggers = triggers.filter(trigger => trigger.Type === 'HTTP' && trigger.Parameters && trigger.Parameters.Domains);
-      const triggerConfig = [];
-      const onlyDomainName = parameters.d || parameters.domain;
-      for (const trigger of triggers) {
-        const t = await fcDomain.deploy(
-          trigger.Parameters.Domains,
-          serviceName,
-          functionName,
-          onlyDomainName
-        )
-
-        triggerConfig.push({
-          TriggerName: trigger.Name,
-          Domains: t
-        })
-      }
-      if (commands[0] === 'domain' && !_.isEmpty(triggerConfig)) {
-        output.Domains = triggerConfig;
+      if (_.isArray(triggers)) {
+        triggers = triggers.filter(trigger => trigger.Type === 'HTTP' && trigger.Parameters && trigger.Parameters.Domains);
+        const triggerConfig = [];
+        const onlyDomainName = parameters.d || parameters.domain;
+        
+        const fcDomain = new CustomDomain(credentials, region);
+        for (const trigger of triggers) {
+          const t = await fcDomain.deploy(
+            trigger.Parameters.Domains,
+            serviceName,
+            functionName,
+            onlyDomainName
+          )
+  
+          triggerConfig.push({
+            TriggerName: trigger.Name,
+            Domains: t
+          })
+        }
+        if (commands[0] === 'domain' && !_.isEmpty(triggerConfig)) {
+          output.Domains = triggerConfig;
+        }
       }
     }
 
