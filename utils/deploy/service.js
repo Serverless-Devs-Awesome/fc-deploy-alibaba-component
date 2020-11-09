@@ -2,6 +2,7 @@
 const _ = require('lodash');
 const yaml = require('js-yaml');
 const fs = require('fs');
+const getUuid = require('uuid-by-string');
 
 const Client = require('../client');
 const Logger = require('../logger');
@@ -250,15 +251,31 @@ class Service extends Client {
       options.internetAccess = internetAccess;
     }
 
-    if (utils.isLogConfigAuto(logConfig) || !_.isEmpty(logConfig)) {
-      const resolvedLogConfig = await this.logClient.transformLogConfig(this.inputs);
-      if (utils.isLogConfigAuto(logConfig)) {
-        await this.saveConfigToTemplate('Log', {
-          Project: resolvedLogConfig.project,
-          LogStore: resolvedLogConfig.logStore
-        })
-      }
+    if (utils.isLogConfigAuto(logConfig)) {
+      this.logger.info('using \'Log: Auto\'');
+      const resolvedLogConfig = await this.logClient.create({
+        ...this.inputs,
+        Properties: {
+          Region: this.region,
+          LogConfig: {
+            Project: `aliyun-fc-${this.region}-${getUuid(this.accountId)}`,
+            LogStore: 'function-log',
+            Description: 'create default log project by serverless tool'
+          }
+        }
+      });
+      this.logger.info(`Default sls project: ${resolvedLogConfig.project}, logStore: ${resolvedLogConfig.logStore}`);
+
+      await this.saveConfigToTemplate('Log', {
+        Project: resolvedLogConfig.project,
+        LogStore: resolvedLogConfig.logStore
+      })
       options.logConfig = resolvedLogConfig;
+    } else if (!_.isEmpty(logConfig)) {
+      options.logConfig = {
+        project: logConfig.Project,
+        logstore: logConfig.LogStore
+      }
     }
 
     const isNasAuto = utils.isNasAutoConfig(nasConfig);

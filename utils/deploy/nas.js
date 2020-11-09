@@ -111,7 +111,7 @@ class Nas extends Client {
       try {
         rs = await this.nasClient.request('DescribeFileSystems', params, REQUESTOPTION)
       } catch (ex) {
-        this.throwError(ex);
+        new ServerlessError(ex);
       }
       totalCount = rs.TotalCount;
       pageNumber = rs.PageNumber;

@@ -24,6 +24,7 @@
     "promise-retry": "^2.0.1",
     "request": "^2.88.2",
     "request-promise": "^4.2.6",
-    "util": "^0.12.3"
+    "util": "^0.12.3",
+    "uuid-by-string": "^3.0.2"
   }
 }
